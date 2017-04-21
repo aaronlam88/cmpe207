@@ -17,15 +17,16 @@
 
 int message_handler(int sock, MYSQL* conn, char* buf) {
     char* command = strtok(buf, " ");
+
     const char* error = "not yet implent";
-    if(strcmp(command, "login")) {
+    if(strcmp(command, "login") == 0) {
         char* username = strtok(NULL, " ");
         char* password = strtok(NULL, " \n");
 
-        if(login(conn, username, password)) {
-            write(sock, "LOGIN", 5);
+        if(login(conn, username, password) == 0) {
+            write(sock, "LOGIN\0", 6);
         } else {
-            write(sock, "FAIL", 4);
+            write(sock, "FAIL\0", 5);
         }
 
         return 0;
