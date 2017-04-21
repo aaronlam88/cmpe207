@@ -19,12 +19,24 @@
 
 void run_client(int sock) {
     char username[40];
+    char buf[BUFSIZ];
     printf("username: ");
     scanf("%s", username);
 
     char pass[40];
+    bzero(buf, BUFSIZ);
     strcpy(pass, getpass("password: "));
 
+    strcat(buf,"login ");
+    strcat(buf, username);
+    strcat(buf," ");
+    strcat(buf,pass);
+
+    write(sock,buf,strlen(buf));
+    bzero(buf, strlen(buf));
+    read(sock,buf,BUFSIZ);
+
+    printf("%s\n", buf );
 }
 
 /*------------------------------------------------------------------------
