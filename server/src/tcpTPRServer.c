@@ -13,6 +13,8 @@
 #include "passivesock.h"
 #include "mysql_connect.h"
 
+#define BACKLOG 10
+
 int message_handler(int sock, MYSQL* conn, char* buf) {
     char* command = strtok(buf, " ");
     const char* error = "not yet implent";
@@ -43,7 +45,8 @@ int message_handler(int sock, MYSQL* conn, char* buf) {
  * @author: Aaron Lam
  */
 void *handle_request (void *input) {
-    MYSQL* conn = getConnect(conn);
+    MYSQL* conn = NULL;
+    conn = getConnect(conn);
 
     /* client socket */
     long *sock_pt = (long*) input;
@@ -52,8 +55,6 @@ void *handle_request (void *input) {
     /* message buffer; use default stdio BUFSIZ */
     char buf[BUFSIZ]; 
     memset(buf, 0, BUFSIZ);
-
-    struct sockaddr_in src_addr;
     
     // getMessage(sock, buf);
     int count = read(sock, buf, BUFSIZ);
@@ -143,7 +144,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* get server socket */
-    sock = passivesock(service, "tcp", 0);
+    sock = passivesock(service, "tcp", BACKLOG);
 
     /* run server */
     run_server(sock);
