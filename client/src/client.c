@@ -21,6 +21,7 @@ void flushInputStream() {
     while ((c = getchar()) != '\n' && c != EOF);
 }
 
+<<<<<<< HEAD
 void printMenu() {
     printf("********************************\n");
     printf("*  ls <filename>               *\n");
@@ -65,6 +66,16 @@ void handleCommand(int sock, char* loginKey) {
 
     return;
 }
+=======
+void run_client(int sock) {
+    char username[40];
+    char buf[BUFSIZ];
+    //int n_read;
+    //char buf_ls[BUFSIZ];
+    //char list[40];
+    printf("username: ");
+    scanf("%s", username);
+>>>>>>> refs/remotes/origin/master
 
 void login(int sock, char* loginKey) {
     int try = 0;
@@ -76,6 +87,7 @@ void login(int sock, char* loginKey) {
 
         char buf[BUFSIZ]; bzero(buf, BUFSIZ);
 
+<<<<<<< HEAD
         // get username
         printf("username: ");
         scanf("%s", username);
@@ -119,7 +131,44 @@ void run_client(int sock) {
         // if login success, handle user command
         handleCommand(sock, loginKey);
     }
+=======
+    
+    	printf("%s\n",buf);
+    	bzero(buf,BUFSIZ);
+    
+
 }
+
+void runn_client(int sock){
+
+	char list[40];
+	char buff[BUFSIZ];
+
+	printf("enter ls to list your courses\n");
+	scanf("%s",list);
+
+	if(strcmp(list,"ls")){
+	printf("type ls\n");
+
+	}
+
+	else{
+	strcat(buff,"ls");
+    
+
+    write(sock,buff,strlen(buff));
+    bzero(buff, strlen(buff));
+    read(sock,buff,BUFSIZ);
+
+
+    printf("your command : %s\n",buff);
+    bzero(buff,BUFSIZ);
+		
+	}
+
+>>>>>>> refs/remotes/origin/master
+}
+
 
 /*------------------------------------------------------------------------
  * main - TCP File Client for TCP File Service
@@ -145,8 +194,9 @@ int main(int argc, char *argv[]) {
     }
 
     int sock = connectsock(host, service, "tcp");
+    int sock1 = connectsock(host, service, "tcp");
 
     run_client(sock);
-
+    runn_client(sock1);
     return 0;
 }

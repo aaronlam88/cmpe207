@@ -21,7 +21,7 @@ SERVER_OBJ = obj/errexit.o obj/passivesock.o obj/tcpTPRServer.o
 #==================================================
 
 #================ Executable Files ================
-PROGRAM =  tcpTPRServer
+PROGRAM =  server
 #==================================================
 
 all: $(PROGRAM)
@@ -37,7 +37,7 @@ obj/mysql_connect.o: src/mysql_connect.c src/mysql_connect.h
 obj/tcpTPRServer.o: src/tcpTPRServer.c obj/mysql_connect.o
 	$(CC) -c $(INCLUDE) $(CFLAGS) $(LIBS) -lpthread src/tcpTPRServer.c -o obj/tcpTPRServer.o 
 
-tcpTPRServer: $(HELPER_OBJ) $(SERVER_OBJ)
+server: $(HELPER_OBJ) $(SERVER_OBJ)
 	gcc $(HELPER_OBJ) $(SERVER_OBJ) -o server -lpthread $(CFLAGS) $(LIBS)
 
 clean:
