@@ -38,7 +38,7 @@ obj/tcpTPRServer.o: src/tcpTPRServer.c obj/mysql_connect.o
 	$(CC) -c $(INCLUDE) $(CFLAGS) $(LIBS) -lpthread src/tcpTPRServer.c -o obj/tcpTPRServer.o 
 
 tcpTPRServer: $(HELPER_OBJ) $(SERVER_OBJ)
-	gcc $(HELPER_OBJ) $(SERVER_OBJ) -o Server -lpthread $(CFLAGS) $(LIBS)
+	gcc $(HELPER_OBJ) $(SERVER_OBJ) -o server -lpthread $(CFLAGS) $(LIBS)
 
 clean:
 	@rm -v obj/*.o $(PROGRAM)

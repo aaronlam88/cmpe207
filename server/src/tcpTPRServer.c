@@ -1,11 +1,9 @@
 /*********************************************************************/
 /* Author: Aaron Lam                                                 */
-/* Description: UDP file server, thread per request                  */
-/*  get file name from client, then creat a thread to handle request */
-/*  the server process is keep alive in a forever while loop         */
+/* Description: TCP server, thread per request                       */
 /*********************************************************************/
 
-/* udpTPRServer.c - main */
+/* tcpTPRServer.c - main */
 
 #include <pthread.h>
 
@@ -15,8 +13,30 @@
 
 #define BACKLOG 10
 
+void getToken(char* token) {
+    FILE* fp;
+    char path[BUFSIZ];
+
+    /* Open the command for reading. */
+    fp = popen("date +%s | sha256sum | base64 | head -c 32 ; echo", "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(1);
+    }
+
+    /* Read the output a line at a time - output it. */
+    fgets(path, sizeof(path)-1, fp);
+    strcpy(token, path);
+
+    /* close */
+    pclose(fp);
+
+    return;
+}
+
 int message_handler(int sock, MYSQL* conn, char* buf) {
     char* command = strtok(buf, " ");
+    char token[33]; token[32] = '\0';
 
     const char* error = "not yet implent";
     if(strcmp(command, "login") == 0) {
@@ -25,6 +45,9 @@ int message_handler(int sock, MYSQL* conn, char* buf) {
 
         if(login(conn, username, password) == 0) {
             write(sock, "LOGIN\0", 6);
+            getToken(token);
+            printf("%s\n", token);
+            write(sock, token, 33);
         } else {
             write(sock, "FAIL\0", 5);
         }
@@ -124,7 +147,7 @@ void run_server (int server_sock) {
 }
 
 /*------------------------------------------------------------------------
- * main - UDP Thread Per Request Server for file transfer service
+ * main - TCP Thread Per Request Server for file transfer service
  *------------------------------------------------------------------------
  */
 int main(int argc, char *argv[]) {
