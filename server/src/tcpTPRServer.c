@@ -13,24 +13,71 @@
 
 #define BACKLOG 10
 
-void commandHandler(int sock, MYSQL* conn, char* token) {
-    const char* logger_format = "commandHandler [%s] %s";
-    int run_flag = 1;
+void getRole(MYSQL* conn,char* username, char* role) {
+    const char* logger_format = "getRole [%s] %s\n";
+    const char* prepare = "SELECT role FROM login WHERE username = '%s'";
+    char query[BUFSIZ];
+    sprintf(query, prepare, username);
+    if(mysql_query(conn, query)) {
+        logger(logger_format, "ERROR", mysql_error(conn));
+        errexit("something wrong with the database");
+    }
+    MYSQL_RES *result = mysql_store_result(conn);
+    MYSQL_ROW row = mysql_fetch_row(result);
+    strcpy(role, row[0]);
+    mysql_free_result(result);
+    return;
+}
 
+void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
+    const char* logger_format = "commandHandler [%s] %s";
+    const char* last_msg = "Server ERROR, closing connection";
+
+    char role[10];
+    getRole(conn, username, role);
+
+    int run_flag = 1;
     while(run_flag) {
-        char buf[BUFSIZ];
-        memset(buf, 0, BUFSIZ);
+        // get current working directory
+        char cwd[BUFSIZ];
+        memset(cwd, 0, BUFSIZ);
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            fprintf(stdout, "Current working dir: %s\n", cwd);
+        }
+        else {
+            write(sock, last_msg, sizeof(last_msg));
+            errexit("cannot getcwd");
+        }
+
+
+       char buf[BUFSIZ];
+       memset(buf, 0, BUFSIZ);
 
         // get user loginKey
-        if(read(sock, buf, strlen(token)) != strlen(token) || strcmp(buf, token) != 0) {
+       if(read(sock, buf, strlen(token)) != strlen(token) || strcmp(buf, token) != 0) {
             const char* message = "log out! wrong key\0";
             write(sock, message, strlen(message));
             logger(logger_format, "ERROR", "wrong key from client!");
             return;
         } else {
-
+            char* command = strtok(buf, " ");
+            if(strcmp(command, "ls") == 0) {
+                    // do ls
+            }
+            if(strcmp(command, "cd") == 0) {
+                    // do cd
+            }
+            if(strcmp(command, "upload") == 0) {
+                    // do upload
+            }
+            if(strcmp(command, "download") == 0) {
+                    // do download
+            }
+            if(strcmp(command, "logout") == 0) {
+                logger(logger_format, "INFO", "user logout");
+                return;
+            }
         }
-
     }
 }
 
@@ -70,7 +117,7 @@ int loginHandler(int sock, MYSQL* conn, char* buf) {
             printf("%s\n", token);
             write(sock, token, 33);
 
-            commandHandler(sock, conn, token);
+            commandHandler(sock, conn, username, token);
         } else {
             write(sock, "FAIL\0", 5);
         }

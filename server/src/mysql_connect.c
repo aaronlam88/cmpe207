@@ -85,6 +85,7 @@ int do_query (MYSQL* conn, const char* query) {
     return 0;
 }
 
+
 // /*Unit test*/
 // int main() {
 //     MYSQL *conn = getConnect(conn);
