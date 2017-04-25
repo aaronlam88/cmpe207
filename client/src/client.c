@@ -20,6 +20,9 @@
 void run_client(int sock) {
     char username[40];
     char buf[BUFSIZ];
+    //int n_read;
+    //char buf_ls[BUFSIZ];
+    //char list[40];
     printf("username: ");
     scanf("%s", username);
 
@@ -36,8 +39,42 @@ void run_client(int sock) {
     bzero(buf, strlen(buf));
     read(sock,buf,BUFSIZ);
 
-    printf("%s\n", buf );
+    
+    	printf("%s\n",buf);
+    	bzero(buf,BUFSIZ);
+    
+
 }
+
+void runn_client(int sock){
+
+	char list[40];
+	char buff[BUFSIZ];
+
+	printf("enter ls to list your courses\n");
+	scanf("%s",list);
+
+	if(strcmp(list,"ls")){
+	printf("type ls\n");
+
+	}
+
+	else{
+	strcat(buff,"ls");
+    
+
+    write(sock,buff,strlen(buff));
+    bzero(buff, strlen(buff));
+    read(sock,buff,BUFSIZ);
+
+
+    printf("your command : %s\n",buff);
+    bzero(buff,BUFSIZ);
+		
+	}
+
+}
+
 
 /*------------------------------------------------------------------------
  * main - TCP File Client for TCP File Service
@@ -63,8 +100,9 @@ int main(int argc, char *argv[]) {
     }
 
     int sock = connectsock(host, service, "tcp");
+    int sock1 = connectsock(host, service, "tcp");
 
     run_client(sock);
-
+    runn_client(sock1);
     return 0;
 }
