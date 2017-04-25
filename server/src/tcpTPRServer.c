@@ -13,6 +13,27 @@
 
 #define BACKLOG 10
 
+void commandHandler(int sock, MYSQL* conn, char* token) {
+    const char* logger_format = "commandHandler [%s] %s";
+    int run_flag = 1;
+
+    while(run_flag) {
+        char buf[BUFSIZ];
+        memset(buf, 0, BUFSIZ);
+
+        // get user loginKey
+        if(read(sock, buf, strlen(token)) != strlen(token) || strcmp(buf, token) != 0) {
+            const char* message = "log out! wrong key\0";
+            write(sock, message, strlen(message));
+            logger(logger_format, "ERROR", "wrong key from client!");
+            return;
+        } else {
+
+        }
+
+    }
+}
+
 void getToken(char* token) {
     FILE* fp;
     char path[BUFSIZ];
@@ -34,7 +55,7 @@ void getToken(char* token) {
     return;
 }
 
-int message_handler(int sock, MYSQL* conn, char* buf) {
+int loginHandler(int sock, MYSQL* conn, char* buf) {
     char* command = strtok(buf, " ");
     char token[33]; token[32] = '\0';
 
@@ -48,6 +69,8 @@ int message_handler(int sock, MYSQL* conn, char* buf) {
             getToken(token);
             printf("%s\n", token);
             write(sock, token, 33);
+
+            commandHandler(sock, conn, token);
         } else {
             write(sock, "FAIL\0", 5);
         }
@@ -87,7 +110,7 @@ void *handle_request (void *input) {
     }
     buf[count] = '\0';
 
-    message_handler(sock, conn, buf);
+    loginHandler(sock, conn, buf);
 
     close(sock);
     mysql_close(conn);
