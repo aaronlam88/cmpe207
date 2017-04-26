@@ -29,12 +29,29 @@ void getRole(MYSQL* conn,char* username, char* role) {
     return;
 }
 
+
+/**
+ * commandHandler: handle user command, check if user has the security token
+ * if has security token: 
+ *      get user command and call the correct function to handle it
+ * if no sercurity token:
+ *      send login fail message back to client
+ *
+ * Arguements:
+ *      int sock: current open socket use to talk to connected client
+ *      MYSQL* conn: current open connection to MySQL database
+ *      char* buf: the buffer that storage the user input
+ * Return:
+ *      return 0 if login success; -1 if fail
+ * @author: Aaron Lam
+ */
 void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
-    const char* logger_format = "commandHandler [%s] %s";
+    const char* logger_format = "commandHandler [%s] %s\n";
     const char* last_msg = "Server ERROR, closing connection";
 
     char role[10];
     getRole(conn, username, role);
+    logger(logger_format, "INFO", role);
 
     int run_flag = 1;
     while(run_flag) {
@@ -42,45 +59,118 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         char cwd[BUFSIZ];
         memset(cwd, 0, BUFSIZ);
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            fprintf(stdout, "Current working dir: %s\n", cwd);
+            logger(logger_format, "INFO", cwd);
         }
         else {
             write(sock, last_msg, sizeof(last_msg));
             errexit("cannot getcwd");
         }
 
+        char buf[BUFSIZ];
+        memset(buf, 0, BUFSIZ);
 
-       char buf[BUFSIZ];
-       memset(buf, 0, BUFSIZ);
+        FILE *fp;
+
+        read(sock, buf, BUFSIZ);
 
         // get user loginKey
-       if(read(sock, buf, strlen(token)) != strlen(token) || strcmp(buf, token) != 0) {
+        if(strncmp(buf, token, 32) != 0) {
+            logger(logger_format, "ERROR", "wrong key from client!");
+
             const char* message = "log out! wrong key\0";
             write(sock, message, strlen(message));
-            logger(logger_format, "ERROR", "wrong key from client!");
+
             return;
         } else {
-            char* command = strtok(buf, " ");
+            logger(logger_format, "INFO", "loginKey check out");
+            
+            // get user input from client
+            memset(buf, 0, BUFSIZ);
+            read(sock, buf, BUFSIZ);
+
+            // parse input, and handle command accordingly
+            char* command = strtok(buf, " \n");
+
             if(strcmp(command, "ls") == 0) {
-                    // do ls
+                // do ls
+                char ls[BUFSIZ];
+                memset(ls, 0, BUFSIZ);
+                strcpy(ls, "/bin/ls -la ");
+
+                if((command = strtok(NULL, "\n"))) {
+                    strcpy(ls, command);
+                }
+
+                fp = popen(ls, "r");
+                if(fp == NULL) {
+                    logger(logger_format, "ERROR", "cannot run ls command");
+                    write(sock, "\r\n", 2);
+                    // error skip the rest
+                    continue;
+                }
+                memset(buf, 0, BUFSIZ);
+                while(fgets(buf, BUFSIZ, fp) != NULL) {
+                    write(sock, buf, strlen(buf));
+                    memset(buf, 0, BUFSIZ);
+                }
+                pclose(fp);
+                write(sock, "\r\n", 2);
+                // done ls, skip the rest
+                continue;
             }
             if(strcmp(command, "cd") == 0) {
-                    // do cd
+                // do cd
+                chdir(strtok(NULL, " \n"));
+                getcwd(cwd, sizeof(cwd));
+                write(sock, cwd, sizeof(cwd));
+                write(sock, "\r\n", 2);
+                // done cd, skip the rest
+                continue;
+            }
+            if(strcmp(command, "mkdir") == 0) {
+                char mkdir[BUFSIZ];
+                memset(mkdir, 0, BUFSIZ);
+                sprintf(mkdir, "mkdir %s", strtok(NULL, "\n"));
+                system(mkdir);
+                write(sock, "\r\n", 2);
+                continue;
+            }
+            if(strcmp(command, "rm") == 0) {
+                char rm[BUFSIZ];
+                memset(rm, 0, BUFSIZ);
+                sprintf(rm, "rm -rf %s", strtok(NULL, "\n"));
+                system(rm);
+                write(sock, "\r\n", 2);
+                continue;
             }
             if(strcmp(command, "upload") == 0) {
-                    // do upload
+                // do upload
+                write(sock, "\r\n", 2);
             }
             if(strcmp(command, "download") == 0) {
-                    // do download
+                // do download
+                write(sock, "\r\n", 2);
             }
             if(strcmp(command, "logout") == 0) {
                 logger(logger_format, "INFO", "user logout");
+                write(sock, "\r\n", 2);
                 return;
             }
+            write(sock, "\r\n", 2);
         }
     }
+    return;
 }
 
+/**
+ * getToken: generate a (highly) unquie 32 character token
+ * 
+ * Arguements:
+ *      char* token: should be char[33] use to store the return of this function
+ * Return:
+ *      void
+ * @author: Aaron Lam
+ */
 void getToken(char* token) {
     FILE* fp;
     char path[BUFSIZ];
@@ -102,9 +192,26 @@ void getToken(char* token) {
     return;
 }
 
+/**
+ * loginHandler: handle user login, check if username and passwork is valid
+ * if login success: 
+ *      call getToken() to get security token
+ *      send login success messge back to client, along with security token
+ *      call commandHandler() to handle user command
+ * if login fail:
+ *      send login fail message back to client
+ *
+ * Arguements:
+ *      int sock: current open socket use to talk to connected client
+ *      MYSQL* conn: current open connection to MySQL database
+ *      char* buf: the buffer that storage the user input
+ * Return:
+ *      return 0 if login success; -1 if fail
+ * @author: Aaron Lam
+ */
 int loginHandler(int sock, MYSQL* conn, char* buf) {
     char* command = strtok(buf, " ");
-    char token[33]; token[32] = '\0';
+    char token[33];
 
     const char* error = "not yet implent";
     if(strcmp(command, "login") == 0) {
@@ -114,7 +221,7 @@ int loginHandler(int sock, MYSQL* conn, char* buf) {
         if(login(conn, username, password) == 0) {
             write(sock, "LOGIN\0", 6);
             getToken(token);
-            printf("%s\n", token);
+            token[33] = '\0';
             write(sock, token, 33);
 
             commandHandler(sock, conn, username, token);

@@ -27,7 +27,7 @@ void printMenu() {
     printf("*  cd <dir>                    *\n");
     printf("*  upload <local_file_path>    *\n");
     printf("*  download <file_in cur_dir>  *\n");
-    printf("*  printMenu                   *\n");
+    printf("*  print                       *\n");
     printf("*  logout                      *\n");
     printf("********************************\n");
 }
@@ -40,21 +40,28 @@ void handleCommand(int sock, char* loginKey) {
     fgets(command, BUFSIZ, stdin);
 
     // run forever, unless logout
-    while(1) {
+    while(strcmp(command, "logout") != 0) {
         if(strcmp(command, "printMenu") == 0) {
             printMenu();
         }
         else {
-        // Always write the loginKey to server before sending command
-        // this step is to authenticate the client
-        // if loginKey doesn't match, command cannot be execute
-        // if client send the wrong key, connect will be terminated by server
-        // write(sock, loginKey, 33);
-        // make sure that command can be read by server
-        // write(sock, command, strlen(command));
+            // Always write the loginKey to server before sending command
+            // this step is to authenticate the client
+            // if loginKey doesn't match, command cannot be execute
+            // if client send the wrong key, connect will be terminated by server
+            write(sock, loginKey, strlen(loginKey));
+            // make sure that command can be read by server
+            write(sock, command, sizeof(command));
 
-        // TODO handle return
-        // base on the command, we may have different return message
+            // TODO handle return
+            // base on the command, we may have different return message
+            char buf[BUFSIZ];
+            memset(buf, 0, BUFSIZ);
+            while(read(sock, buf, BUFSIZ) > 0) {
+                if(strcmp(buf, "\r\n") == 0) break;
+                printf("%s\n", buf);
+                memset(buf, 0, BUFSIZ);
+            }
         }
 
         memset(command, 0, BUFSIZ);
@@ -97,7 +104,6 @@ void login (int sock, char* loginKey) {
             read(sock, buf, BUFSIZ);
 
             strcpy(loginKey, buf);
-            printf("%s\n", loginKey);
             return;
         } else {
             printf("incorrect username or password\n");
