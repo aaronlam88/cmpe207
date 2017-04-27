@@ -3,7 +3,6 @@
 # all objects will be place in obj folder
 # link necessary objects to create exe program
 
-# CFLAGS = $(shell mysql_config --cflags)
 CC = gcc -Wall
 
 #================== Source Files ==================
@@ -12,7 +11,7 @@ CLIENT_SRC = src/connectsock.c src/client.c
 #==================================================
 
 #================== Object Files ==================
-CLIENT_OBJ = obj/errexit.o obj/connectsock.o obj/client.o
+CLIENT_OBJ = obj/errexit.o obj/connectsock.o obj/client.o obj/tcpFileClient.o obj/tcpFileServer.o
 #==================================================
 
 #================ Executable Files ================
@@ -28,4 +27,3 @@ client: $(CLIENT_OBJ)
 	$(CC) $(CLIENT_OBJ) -o client
 clean:
 	@rm -v obj/*.o $(PROGRAM)
-

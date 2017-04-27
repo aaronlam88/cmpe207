@@ -11,6 +11,8 @@
 
 #include "errexit.h"
 #include "connectsock.h"
+#include "tcpFileClient.h"
+#include "tcpFileServer.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -23,10 +25,10 @@ void flushInputStream() {
 
 void printMenu() {
     printf("********************************\n");
-    printf("*  ls <filename>               *\n");
-    printf("*  cd <dir>                    *\n");
+    printf("*  ls [filename]               *\n");
+    printf("*  cd [dir]                    *\n");
     printf("*  upload <local_file_path>    *\n");
-    printf("*  download <file_in cur_dir>  *\n");
+    printf("*  download                    *\n");
     printf("*  print                       *\n");
     printf("*  logout                      *\n");
     printf("********************************\n");
@@ -40,28 +42,49 @@ void handleCommand(int sock, char* loginKey) {
     fgets(command, BUFSIZ, stdin);
 
     // run forever, unless logout
-    while(strcmp(command, "logout") != 0) {
-        if(strcmp(command, "printMenu") == 0) {
+    while(strncmp(command, "logout", 6) != 0) {
+        // handle print first since it don't require resources
+        if(strncmp(command, "print", 5) == 0) {
             printMenu();
+            continue;
         }
-        else {
-            // Always write the loginKey to server before sending command
-            // this step is to authenticate the client
-            // if loginKey doesn't match, command cannot be execute
-            // if client send the wrong key, connect will be terminated by server
-            write(sock, loginKey, strlen(loginKey));
-            // make sure that command can be read by server
-            write(sock, command, sizeof(command));
 
-            // TODO handle return
-            // base on the command, we may have different return message
+        char buf[BUFSIZ];
+        memset(buf, 0, BUFSIZ);
+        // Always write the loginKey to server before sending command
+        // this step is to authenticate the client
+        // if loginKey doesn't match, command cannot be execute
+        // if client send the wrong key, connect will be terminated by server
+        write(sock, loginKey, strlen(loginKey));
+            // make sure that command can be read by server
+        write(sock, command, sizeof(command));
+
+        // base on the command, we may have different return message
+        if(strncmp(command, "download", 8) == 0) {
+
+            if(buf != NULL || strlen(buf) > 0) {
+                sendFileRequest (sock, buf);
+                int fd = createFile(sock, command);
+                getFile(sock,command, fd); 
+            }
+            printf("DONE\n");
+            continue;
+        }
+
+        if(strncmp(command, "upload", 6) == 0) {
             char buf[BUFSIZ];
             memset(buf, 0, BUFSIZ);
-            while(read(sock, buf, BUFSIZ) > 0) {
-                if(strcmp(buf, "\r\n") == 0) break;
-                printf("%s\n", buf);
-                memset(buf, 0, BUFSIZ);
-            }
+
+            getFilePath(sock, buf);
+            sendFileName(sock, buf);
+            sendFile(sock, buf);
+            continue;
+        }
+
+        while(read(sock, buf, BUFSIZ) > 0) {
+            if(strcmp(buf, "\r\n") == 0) break;
+            printf("%s\n", buf);
+            memset(buf, 0, BUFSIZ);
         }
 
         memset(command, 0, BUFSIZ);
@@ -74,42 +97,37 @@ void handleCommand(int sock, char* loginKey) {
 }
 
 void login (int sock, char* loginKey) {
-    int try;
-    // try to login 5 times, after 5 time, shutdown client
-    for(try = 0; try < 5; ++try) {
-        char username[40]; bzero(username, 40);
-        char password[40]; bzero(password, 40);
+    char username[40]; bzero(username, 40);
+    char password[40]; bzero(password, 40);
 
-        char buf[BUFSIZ]; bzero(buf, BUFSIZ);
-        // get username
-        printf("username: ");
-        scanf("%s", username);
+    char buf[BUFSIZ]; bzero(buf, BUFSIZ);
+    // get username
+    printf("username: ");
+    scanf("%s", username);
         // get password
-        strcpy(password, getpass("password: "));
-        flushInputStream();
+    strcpy(password, getpass("password: "));
+    flushInputStream();
 
-        // construct login command
-        sprintf(buf, "login %s %s\n", username, password);
+    // construct login command
+    sprintf(buf, "login %s %s\n", username, password);
 
-        // send login command to server
-        write(sock,buf,strlen(buf));
+    // send login command to server
+    write(sock,buf,strlen(buf));
 
-        // get server response
+    // get server response
+    bzero(buf, strlen(buf));
+    read(sock,buf,BUFSIZ);
+
+    // if login success, get secret key from server
+    if(strcmp(buf, "LOGIN") == 0) {
         bzero(buf, strlen(buf));
-        read(sock,buf,BUFSIZ);
+        read(sock, buf, BUFSIZ);
 
-        // if login success, get secret key from server
-        if(strcmp(buf, "LOGIN") == 0) {
-            bzero(buf, strlen(buf));
-            read(sock, buf, BUFSIZ);
-
-            strcpy(loginKey, buf);
-            return;
-        } else {
-            printf("incorrect username or password\n");
-        }
+        strcpy(loginKey, buf);
+        return;
+    } else {
+        errexit("wrong username or password!\n");
     }
-    errexit("shutdown client after 5 try!");
 }
 
 void run_client(int sock) {
@@ -125,34 +143,6 @@ void run_client(int sock) {
         handleCommand(sock, loginKey);
     }
     return;
-}
-
-void runn_client(int sock){
-
-    char list[40];
-    char buff[BUFSIZ];
-
-    printf("enter ls to list your courses\n");
-    scanf("%s",list);
-
-    if(strcmp(list,"ls")){
-        printf("type ls\n");
-
-    }
-
-    else{
-        strcat(buff,"ls");
-
-
-        write(sock,buff,strlen(buff));
-        bzero(buff, strlen(buff));
-        read(sock,buff,BUFSIZ);
-
-
-        printf("your command : %s\n",buff);
-        bzero(buff,BUFSIZ);
-
-    }
 }
 
 

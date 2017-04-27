@@ -11,12 +11,12 @@ CC = gcc -Wall
 
 #================== Source Files ==================
 ERREXIT_SRC = src/errexit.c 
-HELPER_SRC  = src/mysql_connect.c
+HELPER_SRC  = src/mysql_connect.c src/tcpFileServer.c src/tcpFileClient.c
 SERVERS_SRC = src/passivesock.c
 #==================================================
 
 #================== Object Files ==================
-HELPER_OBJ = obj/mysql_connect.o
+HELPER_OBJ = obj/mysql_connect.o obj/tcpFileServer.o obj/tcpFileClient.o
 SERVER_OBJ = obj/errexit.o obj/passivesock.o obj/tcpTPRServer.o
 #==================================================
 
@@ -26,6 +26,9 @@ PROGRAM =  server
 
 all: $(PROGRAM)
 
+obj/%.o: src/%.c
+	@gcc -Wall -c $< -o $@
+	
 obj/errexit.o: src/errexit.c
 	$(CC) -c src/errexit.c -o obj/errexit.o
 obj/passivesock.o: src/passivesock.c
