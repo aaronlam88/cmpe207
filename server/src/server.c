@@ -271,7 +271,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
             char* end = "\0";
             write(sock, end, sizeof(end));
             // send message over
-            sendMsgOver(sock);
+            // sendMsgOver(sock);
             continue;
         }
         //=============================
