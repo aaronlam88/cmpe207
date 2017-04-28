@@ -98,14 +98,14 @@ void handleCommand(int sock, char* loginKey) {
             do_upload(sock);
         } else {
             int n;
-            while ( (n = recvfrom(sock, buf, BUFSIZ, 0, NULL, NULL)) > 0) {
-                if(buf == NULL || strlen(buf) == 0) {
-                    printf("%s %d\n", buf, n);
+            while ( (n = recvfrom(sock, buf, 4, 0, NULL, NULL)) > 0) {
+                if(strncmp(buf, "\0\0\0\0", 4) == 0) {
                     break;
                 } 
-                printf("%s\n", buf);
+                printf("%s", buf);
                 memset(buf, 0, BUFSIZ);
             }
+            printf("\n");
         }
 
         memset(command, 0, BUFSIZ);
