@@ -15,16 +15,6 @@
 
 #define BACKLOG 10
 
-static int main_pid;
-
-int fork_child()
-{
-    if(getpid() == main_pid)
-        return fork();
-    else
-        exit(0);
-}
-
 void sendMsgOver(int sock) {
     printf("OVER\n");
     write(sock, "\0\0\0\0", 4);
@@ -141,8 +131,9 @@ void getRole(MYSQL* conn,char* username, char* role) {
  *      return 0 if login success; -1 if fail
  * @author: Aaron Lam
  */
-void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
-    const char* logger_format = "commandHandler [%s] '%s'\n";
+void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
+    char logger_format[BUFSIZ];
+    sprintf(logger_format, "thread %lx %s" , pthread_self(), "commandHandler [%s] '%s'\n");
     const char* last_msg = "Server ERROR, closing connection";
 
     // must have but not use variable
@@ -175,6 +166,9 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         memset(buf, 0, BUFSIZ);
         read(sock, buf, 33);
 
+        printf("token: %s", token);
+        printf("key: %s", buf);
+
         // check user loginKey
         if(strncmp(buf, token, 32) != 0) {
             logger(logger_format, "ERROR", "wrong key from client!");
@@ -182,7 +176,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
             write(sock, message, strlen(message));
 
             return;
-        } 
+        }
 
         logger(logger_format, "INFO", "loginKey check out");
 
@@ -371,35 +365,35 @@ int loginHandler(int sock, MYSQL* conn, char* buf) {
  * return nothing. send file name and file content back to client
  * @author: Aaron Lam
  */
-// void *handle_request (void *input) {
-//     const char* logger_format = "thread %02x [%s] %s\n";
-//     logger(logger_format, pthread_self(), "INFO", "start");
-//     MYSQL* conn = NULL;
-//     conn = getConnect(conn);
+void *handle_request (void *input) {
+    const char* logger_format = "thread %02lx [%s] %s\n";
+    logger(logger_format, pthread_self(), "INFO", "start");
+    MYSQL* conn = NULL;
+    conn = getConnect(conn);
 
-//     /* client socket */
-//     long *sock_pt = (long*) input;
-//     int sock = *sock_pt;
+    /* client socket */
+    long *sock_pt = (long*) input;
+    int sock = *sock_pt;
 
-//     // message buffer; use default stdio BUFSIZ
-//     char buf[BUFSIZ]; 
-//     memset(buf, 0, BUFSIZ);
+    // message buffer; use default stdio BUFSIZ
+    char buf[BUFSIZ]; 
+    memset(buf, 0, BUFSIZ);
     
-//     // getMessage(sock, buf);
-//     int count = read(sock, buf, BUFSIZ);
-//     if( count < 0) {
-//         printf("read error\n");
-//     }
-//     buf[count] = '\0';
+    // getMessage(sock, buf);
+    int count = read(sock, buf, BUFSIZ);
+    if( count < 0) {
+        printf("read error\n");
+    }
+    buf[count] = '\0';
 
-//     loginHandler(sock, conn, buf);
+    loginHandler(sock, conn, buf);
 
-//     logger(logger_format, pthread_self(), "INFO", "stop");
+    logger(logger_format, pthread_self(), "INFO", "stop");
 
-//     close(sock);
-//     mysql_close(conn);
-//     pthread_exit(NULL);
-// }
+    close(sock);
+    mysql_close(conn);
+    pthread_exit(NULL);
+}
 
 /**
  * run_server: do server work - get file, and send file
@@ -411,20 +405,18 @@ int loginHandler(int sock, MYSQL* conn, char* buf) {
  * @author: Aaron Lam
  */
 void run_server (int server_sock) {
-    main_pid = getpid();
-
     const char* logger_format = "server [%s] %s\n";
     logger(logger_format, "INFO", "start");
     int sock; /* client socket */
     /* thread id */
-    // pthread_t thread;
+    pthread_t thread;
     /* thread attribule */
-    // pthread_attr_t attr;
+    pthread_attr_t attr;
 
     /* Initialize and set thread detached attribute */
-    // pthread_attr_init(&attr);
+    pthread_attr_init(&attr);
     /* set detach state so main don't have to call pthread_join */
-    // pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
     /* while loop to keep server alive 
      * variables needed for a thread are created in while
@@ -443,44 +435,18 @@ void run_server (int server_sock) {
 
         sock = accept(server_sock, (struct sockaddr *)&src_addr, &socklen);
 
-        // /* create thread to handle request */
-        // if (pthread_create(&thread, &attr, handle_request, (void*) &sock) < 0) {
-        //     printf("pthread_create(): %s\n", strerror(errno));
-        // }
-        int pid = fork_child();
-        if(pid < 0) {
-            printf("fork() error: %s", strerror(errno));
-        }
-        else if (pid == 0) {
-            MYSQL* conn = NULL;
-            conn = getConnect(conn);
-
-            // message buffer; use default stdio BUFSIZ
-            char buf[BUFSIZ]; 
-            memset(buf, 0, BUFSIZ);
-
-            // getMessage(sock, buf);
-            int count = read(sock, buf, BUFSIZ);
-            if( count < 0) {
-                printf("read error\n");
-            }
-            buf[count] = '\0';
-
-            loginHandler(sock, conn, buf);
-            close(sock);
-            exit(0);
-        } else {
-            close(sock);
+        /* create thread to handle request */
+        if (pthread_create(&thread, &attr, handle_request, (void*) &sock) < 0) {
+            printf("pthread_create(): %s\n", strerror(errno));
         }
     }
 
     /* destroy attribute to void memory leak */
-    // pthread_attr_destroy(&attr);
+    pthread_attr_destroy(&attr);
 
     logger(logger_format, "INFO", "stop");
     /* main thread exit */
-    // pthread_exit(NULL);
-    wait(NULL);
+    pthread_exit(NULL);
 }
 
 /*------------------------------------------------------------------------

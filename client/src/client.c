@@ -59,6 +59,10 @@ void do_upload(int sock) {
     memset (&src_addr, 0, sizeof(src_addr));
     socklen_t socklen = sizeof(src_addr);
 
+    printf("File name: ");
+    fgets(buf, BUFSIZ, stdin);
+    buf[strlen(buf) - 1] = '\0';
+
     getFilePath(sock, buf, &src_addr, &socklen);
     sendFileName(sock, buf, src_addr, socklen);
     sendFile(sock, buf, src_addr, socklen);
