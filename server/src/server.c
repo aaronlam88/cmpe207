@@ -17,7 +17,7 @@
 
 void sendMsgOver(int sock) {
     printf("OVER\n");
-    write(sock, "", 1);
+    write(sock, "\0\0\0\0", 4);
 }
 
 void do_upload(int sock) {
@@ -163,7 +163,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         // get user loginKey
         char buf[BUFSIZ];
         memset(buf, 0, BUFSIZ);
-        read(sock, buf, BUFSIZ);
+        read(sock, buf, 33);
 
         // check user loginKey
         if(strncmp(buf, token, 32) != 0) {
