@@ -11,8 +11,8 @@
 
 #include "errexit.h"
 #include "connectsock.h"
-#include "tcpFileClient.h"
-#include "tcpFileServer.h"
+#include "fileClient.h"
+#include "fileServer.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -34,12 +34,44 @@ void printMenu() {
     printf("********************************\n");
 }
 
+void do_download(int sock) {
+    char buf[BUFSIZ];
+    int fd;
+
+    if (sendFileRequest(sock, buf) == -1) {
+        printf("sendFileRequest() error: %s\n", strerror(errno));
+    }
+
+    if ((fd = createFile(sock, buf)) == -1){
+        printf("createFile() error: %s\n", strerror(errno));
+    }
+
+    if (getFile(sock, buf, fd) == -1) {
+        printf("getFile() error: %s\n", strerror(errno));
+    }
+}
+
+void do_upload(int sock) {
+    char buf[BUFSIZ]; /* message buffer; use default stdio BUFSIZ */
+    memset (buf, 0, BUFSIZ);
+
+    struct sockaddr_in src_addr; /* the from address of a client */
+    memset (&src_addr, 0, sizeof(src_addr));
+    socklen_t socklen = sizeof(src_addr);
+
+    getFilePath(sock, buf, &src_addr, &socklen);
+    sendFileName(sock, buf, src_addr, socklen);
+    sendFile(sock, buf, src_addr, socklen);
+}
+
 void handleCommand(int sock, char* loginKey) {
     printMenu();
 
     char command[BUFSIZ];
     printf("> ");
     fgets(command, BUFSIZ, stdin);
+    // drop the '\n' at the end of command
+    command[strlen(command)-1] = '\0';
 
     // run forever, unless logout
     while(strncmp(command, "logout", 6) != 0) {
@@ -61,30 +93,19 @@ void handleCommand(int sock, char* loginKey) {
 
         // base on the command, we may have different return message
         if(strncmp(command, "download", 8) == 0) {
-
-            if(buf != NULL || strlen(buf) > 0) {
-                sendFileRequest (sock, buf);
-                int fd = createFile(sock, command);
-                getFile(sock,command, fd); 
+            do_download(sock);
+        } else if(strncmp(command, "upload", 6) == 0) {
+            do_upload(sock);
+        } else {
+            int n;
+            while ( (n = recvfrom(sock, buf, BUFSIZ, 0, NULL, NULL)) > 0) {
+                if(buf == NULL || strlen(buf) == 0) {
+                    printf("%s %d\n", buf, n);
+                    break;
+                } 
+                printf("%s\n", buf);
+                memset(buf, 0, BUFSIZ);
             }
-            printf("DONE\n");
-            continue;
-        }
-
-        if(strncmp(command, "upload", 6) == 0) {
-            char buf[BUFSIZ];
-            memset(buf, 0, BUFSIZ);
-
-            getFilePath(sock, buf);
-            sendFileName(sock, buf);
-            sendFile(sock, buf);
-            continue;
-        }
-
-        while(read(sock, buf, BUFSIZ) > 0) {
-            if(strcmp(buf, "\r\n") == 0) break;
-            printf("%s\n", buf);
-            memset(buf, 0, BUFSIZ);
         }
 
         memset(command, 0, BUFSIZ);
@@ -92,6 +113,9 @@ void handleCommand(int sock, char* loginKey) {
         fgets(command, BUFSIZ, stdin);
         command[strlen(command)-1] = '\0';
     }
+    // gracefully shutdown client, notify server
+    write(sock, loginKey, strlen(loginKey));
+    write(sock, "logout", strlen("logout"));
 
     return;
 }

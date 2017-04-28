@@ -1,5 +1,6 @@
-#ifndef SYMBOL
-#define SYMBOL value
+#ifndef FILE_CLIENT_H_
+#define FILE_CLIENT_H_
+
 
 #include "errexit.h"
 #include "connectsock.h"

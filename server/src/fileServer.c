@@ -1,19 +1,21 @@
-#include "tcpFileServer.h"
-#include <stdio.h>
+#include "fileServer.h"
 
 /**
  * getFilePath: get file path from client connected to current socket.
  * Arguements:
  * sock     - socket descripter, current open socket
  * buf      - buffer to storage message, using default BUFSIZ
+ * src_addr - source address, will be filled by this function
+ *          - src_addr need to be saved for later use
+ * socklen  - socket length, size of src_addr
  * Return:
  * the requested file path from client is save buf for later use
  * return nothing. Report error code (errno) if recvfrom() fail
  */
-void getFilePath (int sock, char *buf) {
-    int n = read(sock, buf, BUFSIZ);
+void getFilePath (int sock, char *buf, struct sockaddr_in *src_addr, socklen_t *socklen) {
+    int n = recvfrom(sock, buf, BUFSIZ, 0, (struct sockaddr *) src_addr, socklen);
     if (n < 0) {
-        printf("read() error: %s\n", strerror(errno));
+        printf("recvfrom() error: %s\n", strerror(errno));
     }
     buf[n] = '\0';
     return;
@@ -24,20 +26,21 @@ void getFilePath (int sock, char *buf) {
  * Arguements:
  * sock     - socket descripter, current open socket
  * buf      - buffer to storage message, using default BUFSIZ
+ * src_addr - server source address, pass in as value
+ * socklen  - socket length, size of src_addr
  * Return:
  * return nothing. Report error code (errno) if sendto() fail
  */
-void sendFileName (int sock, char *buf) {
+void sendFileName (int sock, char *buf, struct sockaddr_in src_addr, socklen_t socklen) {
     char filename[BUFSIZ];
     memset(filename, 0, BUFSIZ);
     strcpy(filename, basename(buf));
     filename[strlen(filename)] = '\0';
 
-    int count = write(sock, filename, sizeof(filename));
+    int count = sendto(sock, filename, sizeof(filename), 0, (struct sockaddr *)&src_addr, socklen);
     if (count < 0) {
-        printf("write() error: %s\n", strerror(errno));
+        printf("sendto() error: %s\n", strerror(errno));
     }
-
 }
 
 /**
@@ -45,26 +48,27 @@ void sendFileName (int sock, char *buf) {
  * Arguements:
  * sock     - socket descripter, current open socket
  * buf      - buffer to storage message, using default BUFSIZ
+ * src_addr - server source address, pass in as value
+ * socklen  - socket length, size of src_addr
  * Return:
- * return nothing. Report error code (errno) if error
+ * return nothing. Report error code (errno) if sendto() fail
  */
-void sendFile (int sock, char *buf) {
+void sendFile (int sock, char *buf, struct sockaddr_in src_addr, socklen_t socklen) {
     printf("open file: %s\n", buf);
     int fd = open(buf, O_RDONLY); //open file identify by file path
     if ( fd == -1 ) { 
-        write(sock, "\r\n", 2);
+        sendto(sock, NULL, 0, 0, (struct sockaddr *)&src_addr, socklen);
         printf("error openning file: '%s' '%s'\n", buf, strerror(errno));
     }
 
     printf("start sending...\n");
     int n;
-    while ( (n = read(fd, buf, BUFSIZ)) > 0 ) {
-        write(sock, buf, n);
+    while ( (n = read(fd, buf, BUFSIZ-1)) > 0 ) {
+        sendto(sock, buf, n+1, 0, (struct sockaddr *)&src_addr, socklen);
     }
-    sendto(sock, NULL, 0, 0, NULL, 0);
-    
     close(fd);
     printf("close file\n");
-    
-    write(sock, "\r\n", 2);
+
+    write(sock, "\0\0\0\0", 4);
+    printf("done sending\n");
 }

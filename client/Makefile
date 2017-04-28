@@ -11,7 +11,7 @@ CLIENT_SRC = src/connectsock.c src/client.c
 #==================================================
 
 #================== Object Files ==================
-CLIENT_OBJ = obj/errexit.o obj/connectsock.o obj/client.o obj/tcpFileClient.o obj/tcpFileServer.o
+CLIENT_OBJ = obj/errexit.o obj/connectsock.o obj/client.o obj/fileClient.o obj/fileServer.o
 #==================================================
 
 #================ Executable Files ================

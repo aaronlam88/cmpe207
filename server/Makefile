@@ -11,13 +11,13 @@ CC = gcc -Wall
 
 #================== Source Files ==================
 ERREXIT_SRC = src/errexit.c 
-HELPER_SRC  = src/mysql_connect.c src/tcpFileServer.c src/tcpFileClient.c
+HELPER_SRC  = src/mysql_connect.c src/fileServer.c src/fileClient.c
 SERVERS_SRC = src/passivesock.c
 #==================================================
 
 #================== Object Files ==================
-HELPER_OBJ = obj/mysql_connect.o obj/tcpFileServer.o obj/tcpFileClient.o
-SERVER_OBJ = obj/errexit.o obj/passivesock.o obj/tcpTPRServer.o
+HELPER_OBJ = obj/mysql_connect.o obj/fileServer.o obj/fileClient.o
+SERVER_OBJ = obj/errexit.o obj/passivesock.o obj/server.o
 #==================================================
 
 #================ Executable Files ================
@@ -37,8 +37,8 @@ obj/passivesock.o: src/passivesock.c
 obj/mysql_connect.o: src/mysql_connect.c src/mysql_connect.h
 	$(CC) -c $(INCLUDE) $(CFLAGS) $(LIBS) src/mysql_connect.c -o obj/mysql_connect.o
 
-obj/tcpTPRServer.o: src/tcpTPRServer.c obj/mysql_connect.o
-	$(CC) -c $(INCLUDE) $(CFLAGS) $(LIBS) -lpthread src/tcpTPRServer.c -o obj/tcpTPRServer.o 
+obj/server.o: src/server.c obj/mysql_connect.o
+	$(CC) -c $(INCLUDE) $(CFLAGS) $(LIBS) -lpthread src/server.c -o obj/server.o 
 
 server: $(HELPER_OBJ) $(SERVER_OBJ)
 	gcc $(HELPER_OBJ) $(SERVER_OBJ) -o server -lpthread $(CFLAGS) $(LIBS)

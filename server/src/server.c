@@ -10,15 +10,48 @@
 #include "errexit.h"
 #include "passivesock.h"
 #include "mysql_connect.h"
-#include "tcpFileClient.h"
-#include "tcpFileServer.h"
+#include "fileClient.h"
+#include "fileServer.h"
 
 #define BACKLOG 10
 
+void sendMsgOver(int sock) {
+    printf("OVER\n");
+    write(sock, "", 1);
+}
 
+void do_upload(int sock) {
+    char buf[BUFSIZ];
+    int fd;
 
-void do_cd (int sock, char* command) {
+    if (sendFileRequest(sock, buf) == -1) {
+        printf("sendFileRequest() error: %s\n", strerror(errno));
+        return;
+    }
+    if ((fd = createFile(sock, buf)) == -1){
+        printf("createFile() error: %s\n", strerror(errno));
+        return;
+    }
+    if (getFile(sock, buf, fd) == -1) {
+        printf("getFile() error: %s\n", strerror(errno));
+        return;
+    }
+}
+
+void do_download(int sock, struct sockaddr_in src_addr, socklen_t socklen) {
+    char buf[BUFSIZ];
+    memset (buf, 0, BUFSIZ);
+
+    getFilePath(sock, buf, &src_addr, &socklen);
+    sendFileName(sock, buf, src_addr, socklen);
+    sendFile(sock, buf, src_addr, socklen);
+
+    return;
+}
+
+void do_cd (int sock, char* command, struct sockaddr_in src_addr, socklen_t socklen) {
     const char* logger_format = "do_cd [%s] %s\n";
+
     // change directory
     if( chdir(strtok(NULL, " \n")) == -1) {
         logger(logger_format, "ERROR", "cannot do_cd");
@@ -27,12 +60,12 @@ void do_cd (int sock, char* command) {
     // get current directory
     getcwd(cwd, sizeof(cwd));
     // send current directory back to client
-    write(sock, cwd, sizeof(cwd));
-    // send message over
-    write(sock, "\r\n", 2);
+    write(sock, cwd, strlen(cwd));
+    
+    return;
 }
 
-void do_ls (int sock, char* command) {
+void do_ls (int sock, char* command, struct sockaddr_in src_addr, socklen_t socklen) {
     const char* logger_format = "do_ls [%s] %s\n";
 
     char ls[BUFSIZ];
@@ -40,8 +73,9 @@ void do_ls (int sock, char* command) {
     strcpy(ls, "/bin/ls -la ");
 
     if((command = strtok(NULL, "\n"))) {
-        strcpy(ls, command);
+        strcat(ls, command);
     }
+    logger(logger_format, "COMMAND", ls);
 
     // user file and popen to get output of linux command
     FILE *fp;
@@ -49,8 +83,6 @@ void do_ls (int sock, char* command) {
     // if error
     if(fp == NULL) {
         logger(logger_format, "ERROR", "cannot do_ls");
-        // send message over
-        write(sock, "\r\n", 2);
     }
     
     // get the output of ls and send it back to client
@@ -61,9 +93,7 @@ void do_ls (int sock, char* command) {
         memset(buf, 0, BUFSIZ);
     }
     pclose(fp);
-
-    // send message over
-    write(sock, "\r\n", 2);
+    return;
 }
 
 void getRole(MYSQL* conn,char* username, char* role) {
@@ -85,22 +115,30 @@ void getRole(MYSQL* conn,char* username, char* role) {
 
 /**
  * commandHandler: handle user command, check if user has the security token
- * if has security token: 
+ * compare the security token generated for this session with the user's token
+ * if security token match: 
  *      get user command and call the correct function to handle it
- * if no sercurity token:
+ * if no sercurity token || token doesn't match:
  *      send login fail message back to client
+ *      terminate this session
  *
  * Arguements:
- *      int sock: current open socket use to talk to connected client
- *      MYSQL* conn: current open connection to MySQL database
- *      char* buf: the buffer that storage the user input
+ *      int sock:       current open socket use to talk to connected client
+ *      MYSQL* conn:    current open connection to MySQL database
+ *      char* username: the client's username
+ *      char* token:    the security token generated for this session
  * Return:
  *      return 0 if login success; -1 if fail
  * @author: Aaron Lam
  */
 void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
-    const char* logger_format = "commandHandler [%s] %s\n";
+    const char* logger_format = "commandHandler [%s] '%s'\n";
     const char* last_msg = "Server ERROR, closing connection";
+
+    // must have but not use variable
+    struct sockaddr_in src_addr;
+    memset (&src_addr, 0, sizeof(src_addr));
+    socklen_t socklen = sizeof(src_addr);
 
     char role[10];
     getRole(conn, username, role);
@@ -115,7 +153,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         memset(cwd, 0, BUFSIZ);
 
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            logger(logger_format, "INFO", cwd);
+            logger(logger_format, "CWD", cwd);
         }
         else {
             write(sock, last_msg, sizeof(last_msg));
@@ -130,7 +168,6 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         // check user loginKey
         if(strncmp(buf, token, 32) != 0) {
             logger(logger_format, "ERROR", "wrong key from client!");
-
             const char* message = "log out! wrong key\0";
             write(sock, message, strlen(message));
 
@@ -144,39 +181,54 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
         int count = read(sock, buf, BUFSIZ);
 
         // user send an emtpy command
-        if(count == 0) {
+        if(count == 0 || strlen(buf) == 0) {
             logger(logger_format, "DEBUG", "empty command");
+            sendMsgOver(sock);
             continue;
         }
         logger(logger_format, "COMMAND", buf);
 
+        //=============================
+        // handle logout
+        if(strncmp(buf, "logout", 6) == 0) {
+            logger(logger_format, "INFO", "user logout");
+            return;
+        }
+
         // parse input, and handle command accordingly
         char* command = strtok(buf, " \n");
 
+        //=============================
         // do ls -- list all file in current directory
         if(strcmp(command, "ls") == 0) {
-            do_ls(sock, command);
-            // done ls, skip the rest
+            do_ls(sock, command, src_addr, socklen);
+
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-
+        //=============================
         // do cd -- change directory to 
         if(strcmp(command, "cd") == 0) {
-            do_cd(sock, command);
-            // done cd, skip the rest
+            do_cd(sock, command, src_addr, socklen);
+
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-
+        //=============================
         // do mkdir -- create new directory
         if(strcmp(command, "mkdir") == 0) {
             char mkdir[BUFSIZ];
             memset(mkdir, 0, BUFSIZ);
             sprintf(mkdir, "mkdir %s", strtok(NULL, "\n"));
             system(mkdir);
-            write(sock, "\r\n", 2);
+            
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-
+        //=============================
         // do rm -- remove file or directory
         // only rm file from current directory
         if(strcmp(command, "rm") == 0) {
@@ -184,40 +236,38 @@ void commandHandler(int sock, MYSQL* conn, char* username, char* token) {
             memset(rm, 0, BUFSIZ);
             sprintf(rm, "rm -rf %s/%s", cwd, strtok(NULL, "\n"));
             system(rm);
-            write(sock, "\r\n", 2);
+            
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-
+        //=============================
         // handle upload
         // user want to upload file to server
         // get file from user and save it
         if(strcmp(command, "upload") == 0) {
-            char* file = strtok(NULL, " \n");
-            if(file != NULL || strlen(file) > 0) {
-                sendFileRequest (sock, file);
-                int fd = createFile(sock, command);
-                getFile(sock,command, fd); 
-            }
+            do_download(sock, src_addr, socklen);
+
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-
+        //=============================
         // handle download
         // user want to download a file from server
         // send the file back to client
         if(strcmp(command, "download") == 0) {
-            getFilePath(sock, buf);
-            sendFileName(sock, buf);
-            sendFile(sock, buf);
+            do_download(sock, src_addr, socklen);
+            char* end = "\0";
+            write(sock, end, sizeof(end));
+            // send message over
+            sendMsgOver(sock);
             continue;
         }
-        if(strcmp(command, "logout") == 0) {
-            logger(logger_format, "INFO", "user logout");
-            write(sock, "\r\n", 2);
-            return;
-        }
+        //=============================
         // command not handle
-        // send message over back to client
-        write(sock, "\r\n", 2);
+        // send message over
+        sendMsgOver(sock);
     }
     // end while
 
@@ -413,7 +463,7 @@ int main(int argc, char *argv[]) {
         service = argv[1];
         break;
         default:
-        errexit("usage: tcpTPRServer [port]\n");
+        errexit("usage: server [port]\n");
     }
 
     /* get server socket */
