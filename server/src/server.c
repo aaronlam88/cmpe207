@@ -13,11 +13,11 @@
 #include "fileClient.h"
 #include "fileServer.h"
 
-#define BACKLOG 10
+#define BACKLOG 1
 
 void sendMsgOver(int sock) {
-    printf("OVER\n");
-    write(sock, "\0\0\0\0", 4);
+    printf("==============\n");
+    write(sock, "\0", 1);
 }
 
 void do_upload(int sock) {

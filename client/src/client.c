@@ -102,10 +102,11 @@ void handleCommand(int sock, char* loginKey) {
             do_upload(sock);
         } else {
             int n;
-            while ( (n = recvfrom(sock, buf, 4, 0, NULL, NULL)) > 0) {
-                if(strncmp(buf, "\0\0\0\0", 4) == 0) {
+            while ( (n = recvfrom(sock, buf, 1, 0, NULL, NULL)) > 0) {
+                if(buf == NULL || buf[0] == '\0') {
                     break;
-                } 
+                }
+
                 printf("%s", buf);
                 memset(buf, 0, BUFSIZ);
             }
