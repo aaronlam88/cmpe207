@@ -93,7 +93,7 @@ void handleCommand(int sock, char* loginKey) {
         // if client send the wrong key, connect will be terminated by server
         write(sock, loginKey, strlen(loginKey));
             // make sure that command can be read by server
-        write(sock, command, sizeof(command));
+        write(sock, command, strlen(command));
 
         // base on the command, we may have different return message
         if(strncmp(command, "download", 8) == 0) {
@@ -186,7 +186,7 @@ char *service = "9000"; /* default service name */
         host = argv[1];
         break;
         default:
-        fprintf(stderr, "usage: tcpFileClient [host [port]]\n");
+        fprintf(stderr, "usage: client [host [port]]\n");
         return 1;
     }
 
