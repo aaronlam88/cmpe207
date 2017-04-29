@@ -85,6 +85,11 @@ void handleCommand(int sock, char* loginKey) {
             continue;
         }
 
+        // skip empty command
+        if(strlen(command) == 0) {
+            goto SKIP;
+        }
+
         char buf[BUFSIZ];
         memset(buf, 0, BUFSIZ);
         // Always write the loginKey to server before sending command
@@ -92,7 +97,8 @@ void handleCommand(int sock, char* loginKey) {
         // if loginKey doesn't match, command cannot be execute
         // if client send the wrong key, connect will be terminated by server
         write(sock, loginKey, strlen(loginKey));
-            // make sure that command can be read by server
+        
+        // make sure that command can be read by server
         write(sock, command, strlen(command));
 
         // base on the command, we may have different return message
@@ -113,6 +119,7 @@ void handleCommand(int sock, char* loginKey) {
             printf("\n");
         }
 
+        SKIP:
         memset(command, 0, BUFSIZ);
         printf("> ");
         fgets(command, BUFSIZ, stdin);
