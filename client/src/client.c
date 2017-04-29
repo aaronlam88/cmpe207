@@ -148,9 +148,9 @@ void login (int sock, char* loginKey) {
 
     // if login success, get secret key from server
     if(strcmp(buf, "LOGIN") == 0) {
-        bzero(buf, strlen(buf));
+        bzero(buf, BUFSIZ);
         read(sock, buf, BUFSIZ);
-
+        printf("token: %s\n", buf);
         strcpy(loginKey, buf);
         return;
     } else {

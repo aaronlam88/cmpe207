@@ -37,7 +37,7 @@ void sendFileName (int sock, char *buf, struct sockaddr_in src_addr, socklen_t s
     strcpy(filename, basename(buf));
     filename[strlen(filename)] = '\0';
 
-    int count = sendto(sock, filename, strlen(filename), 0, (struct sockaddr *)&src_addr, socklen);
+    int count = sendto(sock, filename, strlen(filename)+1, 0, (struct sockaddr *)&src_addr, socklen);
     if (count < 0) {
         printf("sendto() error: %s\n", strerror(errno));
     }
