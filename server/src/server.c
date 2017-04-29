@@ -349,7 +349,7 @@ int loginHandler(int sock, MYSQL* conn, char* buf) {
             getToken(token);
             token[33] = '\0';
             write(sock, token, 33);
-
+            printf("token: %s\n", token);
             commandHandler(sock, conn, username, token);
         } else {
             write(sock, "FAIL\0", 5);

@@ -124,7 +124,10 @@ void handleCommand(int sock, char* loginKey) {
     return;
 }
 
-void login (int sock, char* loginKey) {
+void login (int sock) {
+    // login key token, use to verify login status
+    char loginKey[33];
+
     char username[40]; bzero(username, 40);
     char password[40]; bzero(password, 40);
 
@@ -148,10 +151,10 @@ void login (int sock, char* loginKey) {
 
     // if login success, get secret key from server
     if(strcmp(buf, "LOGIN") == 0) {
-        bzero(buf, BUFSIZ);
-        read(sock, buf, BUFSIZ);
-        printf("token: %s\n", buf);
-        strcpy(loginKey, buf);
+        bzero(loginKey, 33);
+        read(sock, loginKey, 33);
+        printf("loginKey: %s\n", loginKey);
+        handleCommand(sock, loginKey);
         return;
     } else {
         errexit("wrong username or password!\n");
@@ -159,18 +162,7 @@ void login (int sock, char* loginKey) {
 }
 
 void run_client(int sock) {
-    // login key token, use to verify login status
-    char loginKey[33];
-
-    login(sock, loginKey);
-    if(strlen(loginKey) != 33) {
-        // login fail
-        errexit("login fail!\n");
-    } else {
-        // if login success, handle user command
-        handleCommand(sock, loginKey);
-    }
-    return;
+    login(sock);
 }
 
 
