@@ -143,7 +143,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
 
     char role[10];
     getRole(conn, username, role);
-    logger(logger_format, "INFO", role);
+    logger(logger_format, "ROLE", role);
 
     chdir("courses");
 
