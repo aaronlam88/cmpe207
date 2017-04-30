@@ -27,7 +27,7 @@ void printMenu() {
     printf("********************************\n");
     printf("*  ls [filename]               *\n");
     printf("*  cd [dir]                    *\n");
-    printf("*  upload <local_file_path>    *\n");
+    printf("*  upload                      *\n");
     printf("*  download                    *\n");
     printf("*  print                       *\n");
     printf("*  logout                      *\n");
