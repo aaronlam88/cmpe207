@@ -37,7 +37,7 @@ void sendFileName (int sock, char *buf, struct sockaddr_in src_addr, socklen_t s
     strcpy(filename, basename(buf));
     filename[strlen(filename)] = '\0';
 
-    int count = sendto(sock, filename, sizeof(filename), 0, (struct sockaddr *)&src_addr, socklen);
+    int count = sendto(sock, filename, strlen(filename)+1, 0, (struct sockaddr *)&src_addr, socklen);
     if (count < 0) {
         printf("sendto() error: %s\n", strerror(errno));
     }
@@ -55,20 +55,21 @@ void sendFileName (int sock, char *buf, struct sockaddr_in src_addr, socklen_t s
  */
 void sendFile (int sock, char *buf, struct sockaddr_in src_addr, socklen_t socklen) {
     printf("open file: %s\n", buf);
-    int fd = open(buf, O_RDONLY); //open file identify by file path
-    if ( fd == -1 ) { 
-        sendto(sock, NULL, 0, 0, (struct sockaddr *)&src_addr, socklen);
+    FILE *fp = fopen(buf, "r"); //open file identify by file path
+    if ( fp == NULL ) { 
+        memset(buf, 0, BUFSIZ);
+        sendto(sock, buf, BUFSIZ, 0, (struct sockaddr *)&src_addr, socklen);
         printf("error openning file: '%s' '%s'\n", buf, strerror(errno));
     }
 
     printf("start sending...\n");
-    int n;
-    while ( (n = read(fd, buf, BUFSIZ-1)) > 0 ) {
-        sendto(sock, buf, n+1, 0, (struct sockaddr *)&src_addr, socklen);
+    memset(buf, 0, BUFSIZ);
+    while(fgets(buf, BUFSIZ, fp) != NULL) {
+        write(sock, buf, strlen(buf));
+        memset(buf, 0, BUFSIZ);
     }
-    close(fd);
+    fclose(fp);
+    write(sock, "\0", 1);
     printf("close file\n");
-
-    write(sock, "\0\0\0\0", 4);
     printf("done sending\n");
 }

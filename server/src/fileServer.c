@@ -55,22 +55,21 @@ void sendFileName (int sock, char *buf, struct sockaddr_in src_addr, socklen_t s
  */
 void sendFile (int sock, char *buf, struct sockaddr_in src_addr, socklen_t socklen) {
     printf("open file: %s\n", buf);
-    int fd = open(buf, O_RDONLY); //open file identify by file path
-    if ( fd == -1 ) { 
-        sendto(sock, NULL, 0, 0, (struct sockaddr *)&src_addr, socklen);
+    FILE *fp = fopen(buf, "r"); //open file identify by file path
+    if ( fp == NULL ) { 
+        memset(buf, 0, BUFSIZ);
+        sendto(sock, buf, BUFSIZ, 0, (struct sockaddr *)&src_addr, socklen);
         printf("error openning file: '%s' '%s'\n", buf, strerror(errno));
     }
 
     printf("start sending...\n");
     memset(buf, 0, BUFSIZ);
-    int n;
-    while ( (n = read(fd, buf, BUFSIZ)) > 0 ) {
-        sendto(sock, buf, strlen(buf), 0, (struct sockaddr *)&src_addr, socklen);
+    while(fgets(buf, BUFSIZ, fp) != NULL) {
+        write(sock, buf, strlen(buf));
         memset(buf, 0, BUFSIZ);
     }
-    close(fd);
+    fclose(fp);
+    write(sock, "\0", 1);
     printf("close file\n");
-
-    write(sock, "\0\0\0\0", 4);
     printf("done sending\n");
 }

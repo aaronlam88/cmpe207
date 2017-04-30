@@ -17,7 +17,9 @@
 
 void sendMsgOver(int sock) {
     printf("==============\n");
-    write(sock, "\0", 1);
+    char buf[BUFSIZ];
+    memset(buf, 0, BUFSIZ);
+    write(sock, buf, BUFSIZ);
 }
 
 void do_upload(int sock) {
@@ -145,7 +147,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
     getRole(conn, username, role);
     logger(logger_format, "ROLE", role);
 
-    chdir("courses");
+    chdir("./courses");
 
     int run_flag = 1;
     while(run_flag) {
@@ -264,6 +266,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
             do_download(sock, src_addr, socklen);
             char* end = "\0";
             write(sock, end, sizeof(end));
+            
             // send message over
             sendMsgOver(sock);
             continue;

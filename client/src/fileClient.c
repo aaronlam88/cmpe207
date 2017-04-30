@@ -76,11 +76,12 @@ int getFile (int sock, char *buf, int fd) {
 
     memset(buf, 0, BUFSIZ);
     int n;
-    while ( (n = recvfrom(sock, buf, 4, 0, NULL, NULL)) > 0) {
-        if(buf == NULL || strncmp(buf, "\0\0\0\0", 4) == 0) break;
-        if (write (fd, buf, n) < 0 ) {
+    while ( (n = recvfrom(sock, buf, BUFSIZ, 0, NULL, NULL)) > 0) {
+        int len = strlen(buf);
+        if (write (fd, buf, len) < 0 ) {
             printf("write() error: %s\n", strerror(errno));
         }
+        if(n != len) break;
         memset(buf, 0, BUFSIZ);
     }
     if (n == -1) {
