@@ -22,14 +22,15 @@ void sendMsgOver(int sock) {
 
 void do_upload(int sock) {
     char buf[BUFSIZ];
-    int fd;
+    memset(buf, 0, BUFSIZ);
 
-    if (sendFileRequest(sock, buf) == -1) {
-        printf("sendFileRequest() error: %s\n", strerror(errno));
-        return;
-    }
-    if ((fd = createFile(sock, buf)) == -1){
-        printf("createFile() error: %s\n", strerror(errno));
+    read(sock, buf, BUFSIZ);
+
+    printf("createFile: %s\n", buf);
+    mode_t mode = 0666;
+    int fd = open(buf, O_WRONLY | O_CREAT, mode);
+    if ( fd == -1 ) {
+        printf("open() error: %s\n", strerror(errno));
         return;
     }
     if (getFile(sock, buf, fd) == -1) {
@@ -250,7 +251,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         // user want to upload file to server
         // get file from user and save it
         if(strcmp(command, "upload") == 0) {
-            do_download(sock, src_addr, socklen);
+            do_upload(sock);
 
             // send message over
             sendMsgOver(sock);
