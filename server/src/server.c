@@ -17,9 +17,7 @@
 
 void sendMsgOver(int sock) {
     printf("==============\n");
-    char buf[BUFSIZ];
-    memset(buf, 0, BUFSIZ);
-    write(sock, buf, BUFSIZ);
+    write(sock, "\0", 1);
 }
 
 void do_upload(int sock) {
@@ -264,8 +262,6 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         // send the file back to client
         if(strcmp(command, "download") == 0) {
             do_download(sock, src_addr, socklen);
-            char* end = "\0";
-            write(sock, end, sizeof(end));
             
             // send message over
             sendMsgOver(sock);
