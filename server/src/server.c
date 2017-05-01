@@ -292,7 +292,7 @@ void getToken(char* token) {
     char path[BUFSIZ];
 
     /* Open the command for reading. */
-    fp = popen("date +%s | sha256sum | base64 | head -c 32 ; echo", "r");
+    fp = popen("echo $RANDOM | sha256sum | base64 | head -c 32 ; echo", "r");
     if (fp == NULL) {
         printf("Failed to run command\n" );
         exit(1);
