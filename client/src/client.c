@@ -63,7 +63,7 @@ void do_upload(int sock) {
     fgets(buf, BUFSIZ, stdin);
     buf[strlen(buf) - 1] = '\0';
 
-    write(sock, buf, BUFSIZ);
+    write(sock, buf, strlen(buf)+1);
     sendFile(sock, buf, src_addr, socklen);
 }
 
