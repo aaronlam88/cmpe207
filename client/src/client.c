@@ -42,7 +42,7 @@ void do_download(int sock) {
         printf("sendFileRequest() error: %s\n", strerror(errno));
     }
 
-    if ((fd = createFile(sock, buf)) == -1){
+    if ((fd = createFile(sock, buf)) == -1) {
         printf("createFile() error: %s\n", strerror(errno));
     }
 
@@ -55,16 +55,22 @@ void do_upload(int sock) {
     char buf[BUFSIZ]; /* message buffer; use default stdio BUFSIZ */
     memset (buf, 0, BUFSIZ);
 
-    struct sockaddr_in src_addr; /* the from address of a client */
-    memset (&src_addr, 0, sizeof(src_addr));
-    socklen_t socklen = sizeof(src_addr);
-
     printf("File name: ");
     fgets(buf, BUFSIZ, stdin);
     buf[strlen(buf) - 1] = '\0';
 
-    write(sock, buf, strlen(buf)+1);
-    sendFile(sock, buf, src_addr, socklen);
+    printf("open file: %s\n", buf);
+    FILE *fp = fopen(buf, "r"); //open file identify by file path
+    if ( fp == NULL ) {
+        write(sock, "\0", 1);
+        printf("error openning file: '%s' '%s'\n", buf, strerror(errno));
+    } else {
+        write(sock, buf, strlen(buf) + 1);
+        struct sockaddr_in src_addr;
+        sendFile(sock, buf, src_addr, 0);
+    }
+    fclose(fp);
+    return;
 }
 
 void handleCommand(int sock, char* loginKey) {
@@ -74,18 +80,18 @@ void handleCommand(int sock, char* loginKey) {
     printf("> ");
     fgets(command, BUFSIZ, stdin);
     // drop the '\n' at the end of command
-    command[strlen(command)-1] = '\0';
+    command[strlen(command) - 1] = '\0';
 
     // run forever, unless logout
-    while(strncmp(command, "logout", 6) != 0) {
+    while (strncmp(command, "logout", 6) != 0) {
         // handle print first since it don't require resources
-        if(strncmp(command, "print", 5) == 0) {
+        if (strncmp(command, "print", 5) == 0) {
             printMenu();
             continue;
         }
 
         // skip empty command
-        if(strlen(command) == 0) {
+        if (strlen(command) == 0) {
             goto SKIP;
         }
 
@@ -96,19 +102,19 @@ void handleCommand(int sock, char* loginKey) {
         // if loginKey doesn't match, command cannot be execute
         // if client send the wrong key, connect will be terminated by server
         write(sock, loginKey, strlen(loginKey));
-        
+
         // make sure that command can be read by server
         write(sock, command, strlen(command));
 
         // base on the command, we may have different return message
-        if(strncmp(command, "download", 8) == 0) {
+        if (strncmp(command, "download", 8) == 0) {
             do_download(sock);
-        } else if(strncmp(command, "upload", 6) == 0) {
+        } else if (strncmp(command, "upload", 6) == 0) {
             do_upload(sock);
         } else {
             int n;
             while ( (n = recvfrom(sock, buf, 1, 0, NULL, NULL)) > 0) {
-                if(buf == NULL || buf[0] == '\0') {
+                if (buf == NULL || buf[0] == '\0') {
                     break;
                 }
 
@@ -118,11 +124,12 @@ void handleCommand(int sock, char* loginKey) {
             printf("\n");
         }
 
-        SKIP:
+    // SKIP label
+    SKIP:
         memset(command, 0, BUFSIZ);
         printf("> ");
         fgets(command, BUFSIZ, stdin);
-        command[strlen(command)-1] = '\0';
+        command[strlen(command) - 1] = '\0';
     }
     // gracefully shutdown client, notify server
     write(sock, loginKey, strlen(loginKey));
@@ -142,7 +149,7 @@ void login (int sock) {
     // get username
     printf("username: ");
     scanf("%s", username);
-        // get password
+    // get password
     strcpy(password, getpass("password: "));
     flushInputStream();
 
@@ -150,14 +157,14 @@ void login (int sock) {
     sprintf(buf, "login %s %s\n", username, password);
 
     // send login command to server
-    write(sock,buf,strlen(buf));
+    write(sock, buf, strlen(buf));
 
     // get server response
     bzero(buf, strlen(buf));
-    read(sock,buf,BUFSIZ);
+    read(sock, buf, BUFSIZ);
 
     // if login success, get secret key from server
-    if(strcmp(buf, "LOGIN") == 0) {
+    if (strcmp(buf, "LOGIN") == 0) {
         bzero(loginKey, 33);
         read(sock, loginKey, 33);
         printf("loginKey: %s\n", loginKey);
@@ -178,20 +185,20 @@ void run_client(int sock) {
 *------------------------------------------------------------------------
 */
 int main(int argc, char *argv[]) {
-char *host = "localhost"; /* host to use if none supplied */
-char *service = "9000"; /* default service name */
+    char *host = "localhost"; /* host to use if none supplied */
+    char *service = "9000"; /* default service name */
 
     switch (argc) {
-        case 1:
+    case 1:
         host = "localhost";
         break;
-        case 3:
+    case 3:
         service = argv[2];
-        /* FALL THROUGH */
-        case 2:
+    /* FALL THROUGH */
+    case 2:
         host = argv[1];
         break;
-        default:
+    default:
         fprintf(stderr, "usage: client [host [port]]\n");
         return 1;
     }
