@@ -15,20 +15,46 @@
 
 #define BACKLOG 10
 
+/**
+ * sendMsgOver: send message over signal back to client
+ *      this functiion should be call at the end of every messages from server to client
+ * 
+ * Arguements:
+ *      int sock: current open socket, use to write query result back to client
+ * Return:
+ *      return nothing
+ * @author: Aaron Lam
+ */
 void sendMsgOver(int sock) {
-    printf("==============\n");
+    printf("\n=======================================\n");
     write(sock, "\0", 1);
 }
 
+/**
+ * do_upload: handle upload command from client
+ *      get file from client and save it to current directory
+ * 
+ * Arguements:
+ *      int sock     : current open socket, use to write query result back to client
+ * Return:
+ *      return nothing
+ * @author: Aaron Lam
+ */
 void do_upload(int sock) {
     char buf[BUFSIZ];
     memset(buf, 0, BUFSIZ);
 
+    // get file name
     read(sock, buf, BUFSIZ);
 
+    // create or overwrite file with file name
     printf("createFile: %s\n", buf);
     mode_t mode = 0666;
     int fd = open(buf, O_WRONLY | O_CREAT, mode);
+
+    // current client will not expect error message from upload
+    // therefore, not error message is sent back to client
+    // only log error to stdout
     if ( fd == -1 ) {
         printf("open() error: %s\n", strerror(errno));
         return;
@@ -37,19 +63,64 @@ void do_upload(int sock) {
         printf("getFile() error: %s\n", strerror(errno));
         return;
     }
+    return;
 }
 
+/**
+ * do_download: handle download command from client
+ *      send the requested file back to client
+ * 
+ * Arguements:
+ *      int sock     : current open socket, use to write query result back to client
+ *      struct sockaddr_in src_addr & socklen_t socklen are needed for functions call
+ Return:
+ *      return nothing
+ * @author: Aaron Lam
+ */
 void do_download(int sock, struct sockaddr_in src_addr, socklen_t socklen) {
     char buf[BUFSIZ];
     memset (buf, 0, BUFSIZ);
 
-    getFilePath(sock, buf, &src_addr, &socklen);
-    sendFileName(sock, buf, src_addr, socklen);
-    sendFile(sock, buf, src_addr, socklen);
+    // get file name
+    read(sock, buf, BUFSIZ);
+
+    // only allow download from current directory
+    // therefore only get base name from client, no full path will be read
+    char filename[BUFSIZ];
+    memset(filename, 0, BUFSIZ);
+    strcpy(filename, basename(buf));
+
+    // get file with filename in current directory and send it back to user
+    // current version of client is not expected any error message from server
+    // therefore, only termniate sending file when error occur and log error to stdout
+    if(strlen(filename) != strlen(buf)) {
+        write(sock, "", 0);
+        printf("%s %s\n", "do_download [ERROR] ", buf);
+        return;
+    }
+    // send file to client
+    sendFile(sock, filename, src_addr, socklen);
 
     return;
 }
 
+
+/**
+ * do_cd: handle cd command from client, call linux cd and behave like linux cd
+ *      cd will do security check, cd will not allow user to move out of their designated directory
+ *      if users move out of their designated directory, cd will move them to base directory
+ *
+ * Arguements:
+ *      int sock                : current open socket, use to write query result back to client
+ *      char* command           : cd command
+ *      char* role              : current user role
+ *      char* crs_dir           : server course directory (base directory)
+ *      char courses[10][255]   : courses directory, use for security check
+ * Return:
+ *      return nothing
+ *      write current directory back to client
+ * @author: Aaron Lam
+ */
 void do_cd (int sock, char* command, char* role, char* crs_dir, char courses[10][255]) {
     const char* logger_format = "do_cd [%s] %s\n";
 
@@ -59,7 +130,7 @@ void do_cd (int sock, char* command, char* role, char* crs_dir, char courses[10]
     // get current directory
     getcwd(cwd, sizeof(cwd));
 
-    
+
 
     // create test dir user for in security check
     char test[BUFSIZ];
@@ -100,7 +171,7 @@ void do_cd (int sock, char* command, char* role, char* crs_dir, char courses[10]
     }
     //=========================================
 
-    if(strcmp(cwd, crs_dir) == 0) {
+    if (strcmp(cwd, crs_dir) == 0) {
         // user move back to courses dir allow
         allow = 1;
     }
@@ -117,6 +188,17 @@ void do_cd (int sock, char* command, char* role, char* crs_dir, char courses[10]
     return;
 }
 
+/**
+ * do_ls: handle ls command from client, call linux ls and behave like linux ls with -la option
+ *
+ * Arguements:
+ *      int sock        : current open socket, use to write query result back to client
+ *      char* command   : ls command
+ * Return:
+ *      return nothing
+ *      write ls -la result back to client
+ * @author: Aaron Lam
+ */
 void do_ls (int sock, char* command) {
     const char* logger_format = "do_ls [%s] %s\n";
 
@@ -148,9 +230,21 @@ void do_ls (int sock, char* command) {
     return;
 }
 
+/**
+ * do_sql: handle sql command from client, limit the query to cmpe207 database
+ *
+ * Arguements:
+ *      int sock        : current open socket, use to write query result back to client
+ *      MYSQL* conn     : current open connection to MySQL database
+ *      char* query     : the query get from client and will be perform
+ * Return:
+ *      return nothing
+ *      write query result back to client
+ * @author: Aaron Lam
+ */
 void do_sql(int sock, MYSQL* conn, char* query) {
     const char* logger_format = "do_sql [%s] %s\n";
-    const char* prepare = "mysql cmpe207 -t -u \"cmpe207\" -pcmpe207-Group8 --execute \"%s\"";
+    const char* prepare = "mysql cmpe207 -t -u cmpe207 -pcmpe207-Group8 --execute \"%s\"";
     char buf[BUFSIZ];
     sprintf(buf, prepare, query);
     printf("query: %s\n", buf);
@@ -202,6 +296,20 @@ void getRole(MYSQL* conn, char* username, char* role) {
     return;
 }
 
+
+/**
+ * getCourses: get courses that user currently involve in
+ *              max number of courses is 10
+ *              max length of course name is 255
+ *
+ * Arguements:
+ *      MYSQL* conn             : current open connection to MySQL database
+ *      char* username          : the client's username
+ *      char courses[10][255]   : the return value to caller
+ * Return:
+ *      return nothing
+ * @author: Aaron Lam
+ */
 void getCourses(MYSQL* conn, char* username, char courses[10][255]) {
     const char* logger_format = "getCourses [%s] %s\n";
     const char* prepare = "SELECT coursename FROM course WHERE username = '%s'";
@@ -227,6 +335,7 @@ void getCourses(MYSQL* conn, char* username, char courses[10][255]) {
 /**
  * commandHandler: handle user command, check if user has the security token
  * compare the security token generated for this session with the user's token
+ *
  * if security token match:
  *      get user command and call the correct function to handle it
  * if no sercurity token || token doesn't match:
@@ -243,8 +352,15 @@ void getCourses(MYSQL* conn, char* username, char courses[10][255]) {
  * @author: Aaron Lam
  */
 void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
+    // logger message format
     char logger_format[BUFSIZ];
     sprintf(logger_format, "thread %lx %s" , pthread_self(), "commandHandler [%s] '%s'\n");
+
+    // user try to run admin command warning
+    char warning[BUFSIZ];
+    sprintf(warning, "Attemp to run admin command, %s your action has been recorded!", username);
+
+    // last words from server before it shutdown
     const char* last_msg = "Server ERROR, closing connection";
 
     // must have but not use variable
@@ -295,8 +411,8 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         memset(buf, 0, BUFSIZ);
         read(sock, buf, 33);
 
-        printf("token: %s", token);
-        printf("key: %s", buf);
+        // logger(logger_format, "TOKEN", token);
+        // logger(logger_format, "KEY", buf);
 
         // check user loginKey
         if (strncmp(buf, token, 32) != 0) {
@@ -364,19 +480,11 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         if (strcmp(command, "mkdir") == 0) {
 
             //==============security check==============
-            if (strncmp(role, "admin", 5) == 0) {
-                // no restriction
-                logger(logger_format, "INFO", "run as admin");
-            } else if (strncmp(role, "teacher", 7) == 0) {
-                // class restriction
-                logger(logger_format, "INFO", "run as teacher");
-            } else if (strncmp(role, "student", 7) == 0) {
-                // student folder restrictino
-                logger(logger_format, "INFO", "run as student");
-            } else {
-                // unknown role, for future use
-                // set to no use for now
-                logger(logger_format, "DEBUG", "unknown role");
+            if (strncmp(role, "admin", 5) != 0) {
+                logger(logger_format, "WARING: mkdir", username);
+                write(sock, warning, strlen(warning));
+                sendMsgOver(sock);
+                continue;
             }
             //=========================================
 
@@ -395,19 +503,11 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         if (strcmp(command, "rm") == 0) {
 
             //==============security check==============
-            if (strncmp(role, "admin", 5) == 0) {
-                // no restriction
-                logger(logger_format, "INFO", "run as admin");
-            } else if (strncmp(role, "teacher", 7) == 0) {
-                // class restriction
-                logger(logger_format, "INFO", "run as teacher");
-            } else if (strncmp(role, "student", 7) == 0) {
-                // student folder restrictino
-                logger(logger_format, "INFO", "run as student");
-            } else {
-                // unknown role, for future use
-                // set to no use for now
-                logger(logger_format, "DEBUG", "unknown role");
+            if (strncmp(role, "admin", 5) != 0) {
+                logger(logger_format, "WARING: rm", username);
+                write(sock, warning, strlen(warning));
+                sendMsgOver(sock);
+                continue;
             }
             //=========================================
 
@@ -427,20 +527,8 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         if (strcmp(command, "upload") == 0) {
 
             //==============security check==============
-            if (strncmp(role, "admin", 5) == 0) {
-                // no restriction
-                logger(logger_format, "INFO", "run as admin");
-            } else if (strncmp(role, "teacher", 7) == 0) {
-                // class restriction
-                logger(logger_format, "INFO", "run as teacher");
-            } else if (strncmp(role, "student", 7) == 0) {
-                // student folder restrictino
-                logger(logger_format, "INFO", "run as student");
-            } else {
-                // unknown role, for future use
-                // set to no use for now
-                logger(logger_format, "DEBUG", "unknown role");
-            }
+            // only allow upload to current folder
+            // do_cd should only allow user to get into the right folder
             //=========================================
 
             do_upload(sock);
@@ -456,20 +544,8 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         if (strcmp(command, "download") == 0) {
 
             //==============security check==============
-            if (strncmp(role, "admin", 5) == 0) {
-                // no restriction
-                logger(logger_format, "INFO", "run as admin");
-            } else if (strncmp(role, "teacher", 7) == 0) {
-                // class restriction
-                logger(logger_format, "INFO", "run as teacher");
-            } else if (strncmp(role, "student", 7) == 0) {
-                // student folder restrictino
-                logger(logger_format, "INFO", "run as student");
-            } else {
-                // unknown role, for future use
-                // set to no use for now
-                logger(logger_format, "DEBUG", "unknown role");
-            }
+            // only allow download from current folder
+            // do_cd should only allow user to get into the right folder
             //=========================================
 
             do_download(sock, src_addr, socklen);
@@ -485,23 +561,15 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
         if (strcmp(command, "sql") == 0) {
 
             //==============security check==============
-            if (strncmp(role, "admin", 5) == 0) {
-                // no restriction
-                logger(logger_format, "INFO", "run as admin");
-            } else if (strncmp(role, "teacher", 7) == 0) {
-                // class restriction
-                logger(logger_format, "INFO", "run as teacher");
-            } else if (strncmp(role, "student", 7) == 0) {
-                // student folder restrictino
-                logger(logger_format, "INFO", "run as student");
-            } else {
-                // unknown role, for future use
-                // set to no use for now
-                logger(logger_format, "DEBUG", "unknown role");
+            if (strncmp(role, "admin", 5) != 0) {
+                logger(logger_format, "WARING: sql", username);
+                write(sock, warning, strlen(warning));
+                sendMsgOver(sock);
+                continue;
             }
             //=========================================
             command = strtok(NULL, "\n\0");
-            printf("query: %s\n", command);
+            logger(logger_format, "SQL", command);
             do_sql(sock, conn, command);
             // send message over
             sendMsgOver(sock);
@@ -622,10 +690,10 @@ void *handle_request (void *input) {
     int count = read(sock, buf, BUFSIZ);
     if ( count < 0) {
         printf("read error\n");
+    } else {
+        buf[count] = '\0';
+        loginHandler(sock, conn, buf);
     }
-    buf[count] = '\0';
-
-    loginHandler(sock, conn, buf);
 
     logger(logger_format, pthread_self(), "INFO", "stop");
 

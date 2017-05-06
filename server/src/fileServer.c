@@ -60,6 +60,7 @@ void sendFile (int sock, char *buf, struct sockaddr_in src_addr, socklen_t sockl
         memset(buf, 0, BUFSIZ);
         sendto(sock, buf, BUFSIZ, 0, (struct sockaddr *)&src_addr, socklen);
         printf("error openning file: '%s' '%s'\n", buf, strerror(errno));
+        return;
     }
 
     printf("start sending...\n");
