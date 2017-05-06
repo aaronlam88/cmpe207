@@ -354,7 +354,7 @@ void getCourses(MYSQL* conn, char* username, char courses[10][255]) {
 void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
     // logger message format
     char logger_format[BUFSIZ];
-    sprintf(logger_format, "thread %lx %s" , pthread_self(), "commandHandler [%s] '%s'\n");
+    sprintf(logger_format, "Thread [%lx] %s" , pthread_self(), "commandHandler [%s] '%s'\n");
 
     // user try to run admin command warning
     char warning[BUFSIZ];
