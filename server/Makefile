@@ -4,7 +4,7 @@
 # link necessary objects to create exe program
 
 # CFLAGS = $(shell mysql_config --cflags)
-INCLUDE = -include $(shell mysql_config --variable=pkgincludedir).h
+INCLUDE = -include $(shell mysql_config --variable=pkgincludedir)/mysql.h
 CFLAGS = $(shell mysql_config --cflags)
 LIBS = $(shell mysql_config --libs)
 CC = gcc -Wall

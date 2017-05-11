@@ -55,7 +55,7 @@ void do_upload(int sock) {
     char buf[BUFSIZ]; /* message buffer; use default stdio BUFSIZ */
     memset (buf, 0, BUFSIZ);
 
-    printf("File name: ");
+    printf("File path: ");
     fgets(buf, BUFSIZ, stdin);
     buf[strlen(buf) - 1] = '\0';
 

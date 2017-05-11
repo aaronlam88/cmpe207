@@ -15,6 +15,8 @@
 
 #define BACKLOG 10
 
+static char SERVER_DIR[255];
+
 /**
  * sendMsgOver: send message over signal back to client
  *      this functiion should be call at the end of every messages from server to client
@@ -386,6 +388,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
     }
 
     // change working directory to ./courses
+    chdir(SERVER_DIR);
     chdir("./courses");
 
     // get current courses directory
@@ -481,7 +484,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
 
             //==============security check==============
             if (strncmp(role, "admin", 5) != 0) {
-                logger(logger_format, "WARING: mkdir", username);
+                logger(logger_format, "WARNING: mkdir", username);
                 write(sock, warning, strlen(warning));
                 sendMsgOver(sock);
                 continue;
@@ -504,7 +507,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
 
             //==============security check==============
             if (strncmp(role, "admin", 5) != 0) {
-                logger(logger_format, "WARING: rm", username);
+                logger(logger_format, "WARNING: rm", username);
                 write(sock, warning, strlen(warning));
                 sendMsgOver(sock);
                 continue;
@@ -562,7 +565,7 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
 
             //==============security check==============
             if (strncmp(role, "admin", 5) != 0) {
-                logger(logger_format, "WARING: sql", username);
+                logger(logger_format, "WARNING: sql", username);
                 write(sock, warning, strlen(warning));
                 sendMsgOver(sock);
                 continue;
@@ -582,6 +585,9 @@ void commandHandler(int sock, MYSQL* conn, char* username, const char* token) {
     }
     // end while
 
+    chdir(SERVER_DIR);
+    logger(logger_format, "DEBUG", "thread");
+    printf("=======================================\n\n");
     return;
 }
 
@@ -776,6 +782,8 @@ int main(int argc, char *argv[]) {
     default:
         errexit("usage: server [port]\n");
     }
+
+    getcwd(SERVER_DIR, sizeof(SERVER_DIR));
 
     /* get server socket */
     sock = passivesock(service, "tcp", BACKLOG);
